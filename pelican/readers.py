@@ -13,7 +13,13 @@ try:
     from markdown import Markdown
 except ImportError:
     Markdown = False  # NOQA
+try:
+    from asciidocapi import AsciiDocAPI
+except ImportError:
+    AsciiDocAPI = False
 import re
+import StringIO
+from codecs import open as _open
 
 from pelican.contents import Category, Tag, Author
 from pelican.utils import get_date, open
@@ -138,6 +144,63 @@ class MarkdownReader(Reader):
             name = name.lower()
             metadata[name] = self.process_metadata(name, value[0])
         return content, metadata
+
+
+class AsciiDocReader(Reader):
+  enabled = bool(AsciiDocAPI)
+  file_extensions = ['txt']
+
+  def read(self, filename):
+    """Parse content and metadata of asciidoc files"""
+    ad = AsciiDocAPI()
+    ad.options('--no-header-footer')
+    buf = StringIO.StringIO()
+    ad.execute(filename, buf, 'html5')
+    content = buf.getvalue()
+    buf.close()
+    meta = self.read_meta(filename)
+    return content, meta
+
+  meta_re = re.compile(r'^:(.+?): (.+)$')
+  author_re = re.compile(r'^([^\s].+?) <([^\s]+?)>$')
+  rev_re = re.compile(r'^(?:(.+?),)? *(.+?): *(.+?)$')
+
+  def read_meta(self, filename):
+    title = None
+    metadata = {}
+    with _open(filename, encoding='utf-8') as f:
+      for line in f:
+        line = line.rstrip()
+        meta_match = self.meta_re.match(line)
+        author_match = self.author_re.match(line)
+        rev_match = self.rev_re.match(line)
+        if line.strip() != '' and title == None:
+          title = line
+          metadata['title'] = title
+        elif line.strip() == '' and title != None:
+          break
+        elif meta_match:
+          name = meta_match.group(1).lower()
+          value = meta_match.group(2)
+          metadata[name] = self.process_metadata(name, value)
+          if name == 'revdate':
+            metadata['date'] = self.process_metadata(name, value)
+        elif author_match:
+          author = author_match.group(1)
+          email = author_match.group(2)
+          metadata['author'] = self.process_metadata('author', author)
+          metadata['email'] = self.process_metadata('email', email)
+        elif rev_match:
+          rev = rev_match.group(1)
+          date = rev_match.group(2)
+          comment = rev_match.group(3)
+          metadata['revdate'] = date
+          metadata['date'] = self.process_metadata('date', date)
+          metadata['revnumber'] = rev
+          metadata['revremark'] = comment
+        else:
+          continue
+    return metadata
 
 
 class HtmlReader(Reader):
