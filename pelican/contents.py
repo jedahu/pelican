@@ -7,6 +7,7 @@ from datetime import datetime
 from os import getenv
 from sys import platform, stdin
 
+from os.path import basename, splitext
 
 from pelican.settings import _DEFAULT_CONFIG
 from pelican.utils import slugify, truncate_html_words
@@ -69,7 +70,10 @@ class Page(object):
 
         # create the slug if not existing, from the title
         if not hasattr(self, 'slug') and hasattr(self, 'title'):
-            self.slug = slugify(self.title)
+            if settings['SLUG_FROM_FILENAME']:
+                self.slug = slugify(basename(splitext(filename)[0]))
+            else:
+                self.slug = slugify(self.title)
 
         if filename:
             self.filename = filename
