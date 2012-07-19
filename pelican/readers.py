@@ -154,6 +154,9 @@ class AsciiDocReader(Reader):
     """Parse content and metadata of asciidoc files"""
     ad = AsciiDocAPI()
     ad.options('--no-header-footer')
+    ad.attributes['pygments'] = 'pygments'
+    if self.settings['ASCIIDOC_CONF']:
+      ad.attributes['conf-files'] = self.settings['ASCIIDOC_CONF']
     buf = StringIO.StringIO()
     ad.execute(filename, buf, 'html5')
     content = buf.getvalue()
